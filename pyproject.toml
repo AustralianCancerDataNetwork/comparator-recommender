@@ -8,6 +8,7 @@ dependencies = [
   "groundworkers>=0.4,<1",
   "oa-configurator>=1.2.1,<2",
   "pydantic>=2,<3",
+  "sqlalchemy>=2,<3",
 ]
 
 [project.entry-points."omop.config"]
@@ -31,11 +32,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/comparator_recommender"]
 
-# Development-only sibling checkouts exercise the unreleased plugin work. These
-# source choices are uv-local metadata and are not included in built artifacts.
+# Unreleased plugin work lives on each repo's `plugins` branch. These source
+# choices are uv-local metadata and are not included in built artifacts.
 [tool.uv.sources]
-groundworkers = { path = "../groundworkers", editable = true }
-groundskeeping = { path = "../../core-stack/groundskeeping", editable = true }
+groundworkers = { git = "https://github.com/AustralianCancerDataNetwork/groundworkers", branch = "plugins" }
+groundskeeping = { git = "https://github.com/AustralianCancerDataNetwork/groundskeeping.git", branch = "plugins" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

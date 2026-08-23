@@ -98,7 +98,6 @@ def test_plugin_composes_adapter_service_and_diagnostic_tool() -> None:
         "comparator_db": "cdm_db",
         "embedding_model_name": None,
         "vector_store_name": None,
-        "min_databases_default": 2,
         "recommendation_functionality": False,
     }
 
@@ -130,7 +129,6 @@ def test_generic_provider_writes_comparator_recommender_configuration(
         {"embedding_model_name": "__not_configured__"}
     ).snapshot
     snapshot = controller.submit({"vector_store_name": "__not_configured__"}).snapshot
-    snapshot = controller.submit({"min_databases_default": 3}).snapshot
 
     assert isinstance(snapshot.step, ReviewStep)
     assert snapshot.can_apply
@@ -140,11 +138,9 @@ def test_generic_provider_writes_comparator_recommender_configuration(
     configured = ComparatorRecommenderConfig.validate_candidate(saved)
     assert saved.tools["comparator_recommender"] == {
         "comparator_db": "cdm_db",
-        "min_databases_default": 3,
     }
     assert configured == ComparatorRecommenderConfig(
         comparator_db="cdm_db",
         embedding_model_name=None,
         vector_store_name=None,
-        min_databases_default=3,
     )
