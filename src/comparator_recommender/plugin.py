@@ -13,14 +13,18 @@ from typing import Any, ClassVar
 from groundworkers.plugins import PluginContext
 from oa_configurator import PackageConfigBase
 
+from comparator_recommender.adapters import ComparatorDataAdapter
 from comparator_recommender.config import ComparatorRecommenderConfig
+from comparator_recommender.services import ComparatorRecommenderService
+from comparator_recommender.tools import register_tools
 
 
 @dataclass(frozen=True)
 class ComparatorRecommenderState:
-    """Validated configuration retained by the MWE plugin."""
+    """Objects built once and then shared by all of this plugin's tools."""
 
     config: ComparatorRecommenderConfig
+    service: ComparatorRecommenderService
 
 
 class ComparatorRecommenderPlugin:
@@ -34,12 +38,22 @@ class ComparatorRecommenderPlugin:
         context: PluginContext,
         config: PackageConfigBase | None,
     ) -> ComparatorRecommenderState | None:
-        """Accept the host-validated configuration without building a recommender."""
+        """Connect configuration, adapters, and services at application startup."""
 
-        del context
         if not isinstance(config, ComparatorRecommenderConfig):
             return None
-        return ComparatorRecommenderState(config=config)
+
+        # BUILD/COMPOSITION ONLY:
+        # ``build`` joins the layers together; it should not contain SQL or
+        # recommendation rules. Resolve any additional configured connections,
+        # construct their adapters, and then give those adapters to services.
+
+        comparator_database = context.resolver.resolve_database(config.comparator_db)
+        comparator_data = ComparatorDataAdapter(database=comparator_database)
+        service = ComparatorRecommenderService(
+            comparator_data=comparator_data
+        )
+        return ComparatorRecommenderState(config=config, service=service)
 
     def register(self, server: Any, state: object) -> None:
         """Register a diagnostic tool proving configuration reached the plugin."""
@@ -47,16 +61,12 @@ class ComparatorRecommenderPlugin:
         if not isinstance(state, ComparatorRecommenderState):
             raise TypeError("Comparator Recommender received invalid plugin state.")
 
-        @server.tool("comparator_recommender_status")
-        def comparator_recommender_status() -> dict[str, object]:
-            return {
-                "configured": True,
-                "comparator_db": state.config.comparator_db,
-                "embedding_model_name": state.config.embedding_model_name,
-                "vector_store_name": state.config.vector_store_name,
-                "min_databases_default": state.config.min_databases_default,
-                "recommendation_functionality": False,
-            }
+        # REGISTRATION ONLY:
+
+        # Keep the tool definitions in tools.py. This method only hands the MCP
+        # server and the already-built service to that registration function.
+
+        register_tools(server, state.config, state.service)
 
 
 plugin = ComparatorRecommenderPlugin()
