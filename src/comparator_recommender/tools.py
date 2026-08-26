@@ -1,7 +1,7 @@
 """MCP tools exposed by the plugin."""
 
 from typing import Any
-
+import asyncio
 from comparator_recommender.services import ComparatorRecommenderService
 
 
@@ -12,11 +12,11 @@ def register_tools(
     """Register thin lookup and recommendation entry points."""
 
     @server.tool("comparator_recommender_find_target")
-    def comparator_recommender_find_target(
+    async def comparator_recommender_find_target(
         name: str, top_n: int = 10
     ) -> dict[str, object]:
         """Find existing target cohorts by semantic similarity to a name."""
-        matches = service.find_target(name, top_n)
+        matches = await asyncio.to_thread(service.find_target, name, top_n)
         return {
             "matches": [
                 {"id": cohort_id, "name": cohort_name}
