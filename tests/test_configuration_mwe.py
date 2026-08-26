@@ -15,6 +15,7 @@ from groundworkers.plugins import (
 from oa_configurator import (
     CDMDatabaseConfig,
     ConnectionConfig,
+    GenericDatabaseConfig,
     Resolver,
     StackConfig,
     load_stack_config_from_path,
@@ -37,7 +38,11 @@ def _write_minimal_stack(path: Path) -> None:
                 connection="cdm_main",
                 schema_name="main",
                 vocab_schema="main",
-            )
+            ),
+            "comparator_db": GenericDatabaseConfig(
+                connection="cdm_main",
+                schema_name="main",
+            ),
         },
     )
     save_stack_config(stack, path)
@@ -61,7 +66,11 @@ def test_plugin_composes_adapter_service_and_diagnostic_tool() -> None:
                 connection="cdm_main",
                 schema_name="main",
                 vocab_schema="main",
-            )
+            ),
+            "comparator_db": GenericDatabaseConfig(
+                connection="cdm_main",
+                schema_name="main",
+            ),
         },
     )
     context = PluginContext(
@@ -75,10 +84,10 @@ def test_plugin_composes_adapter_service_and_diagnostic_tool() -> None:
     )
     state = plugin.build(
         context,
-        ComparatorRecommenderConfig(comparator_db="cdm_db"),
+        ComparatorRecommenderConfig(comparator_db="comparator_db"),
     )
     assert state is not None
-    assert state.service.comparator_data.database.name == "cdm_db"
+    assert state.service.comparator_data.database.name == "comparator_db"
 
     class FakeServer:
         def __init__(self):
@@ -93,12 +102,16 @@ def test_plugin_composes_adapter_service_and_diagnostic_tool() -> None:
 
     server = FakeServer()
     plugin.register(server, state)
-    assert server.tools["comparator_recommender_status"]() == {
-        "configured": True,
-        "comparator_db": "cdm_db",
-        "embedding_model_name": None,
-        "vector_store_name": None,
-        "recommendation_functionality": False,
+    status = server.tools["comparator_recommender_status"]()
+    assert status == state.service.verify_readiness().as_dict()
+    assert status["state"] == "warning"
+    assert status["configured"] is True
+    assert status["ready"] is False
+    assert {field["key"] for field in status["fields"]} >= {
+        "database_connection",
+        "cohort_table",
+        "similarity_table",
+        "embedding_model",
     }
 
 
@@ -110,7 +123,47 @@ def test_installed_plugin_contributes_a_generic_setup_page(tmp_path: Path) -> No
 
     spec = build_groundworkers_tui_spec(config_path=str(path))
 
-    assert spec.validate().keys() == ("setup", "plugin.comparator_recommender")
+    assert spec.validate().keys() == (
+        "setup",
+        "plugin_comparator_recommender",
+        "comparator_recommender_load_source",
+        "comparator_recommender_create_embeddings",
+    )
+    page = spec.pages[1].factory(None)
+    view = page.landing_view(None)
+    assert view.status.value == "warning"
+    assert tuple(action.label for action in view.actions) == ("Configure", "Verify")
+    assert {row.key for row in view.rows} >= {
+        "database_connection",
+        "cohort_table",
+        "cohort_rows",
+        "embedding_column",
+        "populated_embeddings",
+        "vector_index",
+        "embedding_model",
+    }
+
+
+def test_setup_steps_build_durable_commands(tmp_path: Path) -> None:
+    cohort = tmp_path / "cohort.csv"
+    similarity = tmp_path / "similarity.csv"
+    cohort.touch()
+    similarity.touch()
+
+    load_step, embedding_step = plugin.setup_steps
+    plan = load_step.build_plan(
+        {
+            "cohort_table_path": cohort,
+            "similarity_table_path": similarity,
+        },
+        str(tmp_path / "config.toml"),
+    )
+    assert plan.kind == "comparator-recommender-load-source"
+    assert "comparator_recommender.setup_cli" in plan.steps[0].command.argv
+    assert str(cohort) in plan.steps[0].command.argv
+    assert embedding_step.build_plan({}, str(tmp_path / "config.toml")).kind == (
+        "comparator-recommender-create-embeddings"
+    )
 
 
 def test_generic_provider_writes_comparator_recommender_configuration(
@@ -124,11 +177,11 @@ def test_generic_provider_writes_comparator_recommender_configuration(
 
     snapshot = controller.start()
     assert snapshot.step.key == "comparator_db"
-    snapshot = controller.submit({"comparator_db": "cdm_db"}).snapshot
+    snapshot = controller.submit({"comparator_db": "comparator_db"}).snapshot
     snapshot = controller.submit(
         {"embedding_model_name": "__not_configured__"}
     ).snapshot
-    snapshot = controller.submit({"vector_store_name": "__not_configured__"}).snapshot
+    snapshot = controller.submit({"min_databases_default": 3}).snapshot
 
     assert isinstance(snapshot.step, ReviewStep)
     assert snapshot.can_apply
@@ -137,10 +190,11 @@ def test_generic_provider_writes_comparator_recommender_configuration(
     saved = load_stack_config_from_path(path)
     configured = ComparatorRecommenderConfig.validate_candidate(saved)
     assert saved.tools["comparator_recommender"] == {
-        "comparator_db": "cdm_db",
+        "comparator_db": "comparator_db",
+        "min_databases_default": 3,
     }
     assert configured == ComparatorRecommenderConfig(
-        comparator_db="cdm_db",
+        comparator_db="comparator_db",
         embedding_model_name=None,
-        vector_store_name=None,
+        min_databases_default=3,
     )

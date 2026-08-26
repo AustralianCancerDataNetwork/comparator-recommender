@@ -528,8 +528,12 @@ name = "comparator-recommender"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "groundworkers" },
+    { name = "groundworkers", extra = ["tui"] },
     { name = "oa-configurator" },
+    { name = "omop-emb" },
+    { name = "omop-llm" },
+    { name = "pandas" },
+    { name = "pgvector" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
 ]
@@ -544,15 +548,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "groundworkers", git = "https://github.com/AustralianCancerDataNetwork/groundworkers?branch=plugins" },
+    { name = "groundworkers", extras = ["tui"], git = "https://github.com/AustralianCancerDataNetwork/groundworkers.git?branch=plugins" },
     { name = "oa-configurator", specifier = ">=1.2.1,<2" },
+    { name = "omop-emb", specifier = ">=2.1,<3" },
+    { name = "omop-llm", specifier = ">=1,<2" },
+    { name = "pandas", specifier = ">=3" },
+    { name = "pgvector", specifier = ">=0.5,<1" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "sqlalchemy", specifier = ">=2,<3" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "groundskeeping", git = "https://github.com/AustralianCancerDataNetwork/groundskeeping.git?branch=plugins" },
+    { name = "groundskeeping", specifier = ">=0.6.1,<1" },
     { name = "pytest", specifier = ">=9,<10" },
     { name = "ruff", specifier = ">=0.4" },
     { name = "ty", specifier = ">=0.0.59" },
@@ -1005,18 +1013,22 @@ wheels = [
 
 [[package]]
 name = "groundskeeping"
-version = "0.6.2.dev1+g5ba72d7ab"
-source = { git = "https://github.com/AustralianCancerDataNetwork/groundskeeping.git?branch=plugins#5ba72d7aba188acc48fd43ccccadd491a35adcab" }
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "oa-configurator" },
     { name = "pydantic" },
     { name = "textual" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/40/86/d250cb796aff005ce897eb3a66441be3202abd12b81fe7794fe1d453d2f1/groundskeeping-0.7.0.tar.gz", hash = "sha256:1fdff1cc5a9e38f43d92056063b518c65ec69f008d5e6e063728e438b08c05e0", size = 203784, upload-time = "2026-08-26T03:02:28.566Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/1d/46b4727a863cac84c27c1bfd26af83ea20ef4675bde42ab7fe6af4fd3624/groundskeeping-0.7.0-py3-none-any.whl", hash = "sha256:4dafea7dce586a64ea820974848f6e25898e41592d98645f40a71afc65a13fb0", size = 74688, upload-time = "2026-08-26T03:02:27.113Z" },
+]
 
 [[package]]
 name = "groundworkers"
-version = "0.4.1.dev2+g5095f8694"
-source = { git = "https://github.com/AustralianCancerDataNetwork/groundworkers?branch=plugins#5095f8694e843ae8e9c035f0c59f096e6ee8afd6" }
+version = "0.4.1.dev10+g3e6256b24"
+source = { git = "https://github.com/AustralianCancerDataNetwork/groundworkers.git?branch=plugins#3e6256b24c1a0b1f4bae41d50fb872e22f14beb6" }
 dependencies = [
     { name = "fastapi" },
     { name = "mcp", extra = ["cli"] },
@@ -1034,6 +1046,13 @@ dependencies = [
     { name = "pyyaml" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+tui = [
+    { name = "groundskeeping" },
+    { name = "rich" },
+    { name = "textual" },
 ]
 
 [[package]]
@@ -2200,7 +2219,7 @@ wheels = [
 
 [[package]]
 name = "omop-alchemy"
-version = "1.0.0"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "oa-configurator" },
@@ -2211,9 +2230,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/89/bd/22405797161da62d9eefc26614729696ac06a7de67491bb3bf3f6dca352d/omop_alchemy-1.0.0.tar.gz", hash = "sha256:bb74526a09e4a7f26eb16ce6607ebb42c580a3471d2b5f01735e8a8de3deab95", size = 388728, upload-time = "2026-08-12T12:01:31.502Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/b6/315c72cba081c4cb5fed6737155047667e9057b92307579200551953e248/omop_alchemy-1.1.0.tar.gz", hash = "sha256:d78905132ad0f8933d8d6fceccbac903f497d40a54634ec9193023b237bb5afb", size = 395165, upload-time = "2026-08-24T06:19:41.929Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/17/6ee28f49997b82c3c9a07262ec4a191b6bed7f736b31582cea1d8c52784a/omop_alchemy-1.0.0-py3-none-any.whl", hash = "sha256:121ab13d9e26c49b752a5a4556c99a7c187d9fe7257896dbcdb7ae0fdbb6434c", size = 231095, upload-time = "2026-08-12T12:01:29.686Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/2c/c51519b2c1ff3b71b1117ca5e829451cbbe0d77d404d3ff8b485bd3e989c/omop_alchemy-1.1.0-py3-none-any.whl", hash = "sha256:31b64099145a6183fb71d6d89ecd662a506b5e9f9ab74b0b117860e1085991eb", size = 233776, upload-time = "2026-08-24T06:19:40.288Z" },
 ]
 
 [[package]]
@@ -2240,7 +2259,7 @@ wheels = [
 
 [[package]]
 name = "omop-graph"
-version = "2.0.0"
+version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "oa-configurator" },
@@ -2251,9 +2270,9 @@ dependencies = [
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/fb/9a0f09ea76f78bd6bb8446dbec72596c2f3771540e22ede62d238526d89e/omop_graph-2.0.0.tar.gz", hash = "sha256:8c83ac746b0d25e427e5f99c41a31bdc8d6fcf792fcf925b664169be83a0615e", size = 457763, upload-time = "2026-08-13T01:50:51.313Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/b3/9bd23eaa0c1075279fa37472ddb3b4b1fafb2dd985b85ea258a8521d2436/omop_graph-2.1.0.tar.gz", hash = "sha256:870feca44a91f93c840ea4a84ac44292e962288e91bcd7d0995f99847cad35fd", size = 460091, upload-time = "2026-08-24T08:35:42.495Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/2d/b193ccf42b43f87bb6abbf209f04130adb32d7bddf295074d474cb3397b6/omop_graph-2.0.0-py3-none-any.whl", hash = "sha256:9c9e390cfb40049bb7f3586ec428a07f1b04036be2742a0e2abb8b3c32551fa7", size = 84277, upload-time = "2026-08-13T01:50:50.116Z" },
+    { url = "https://files.pythonhosted.org/packages/90/ef/e896ba1b2711aba66db0b297f72ae694e2cb60e057ccf29f3943808012a7/omop_graph-2.1.0-py3-none-any.whl", hash = "sha256:9de67d14c91fea99be629ed66306ef2e9436d3fb7b2d45fa2d2394d4768fd40b", size = 124996, upload-time = "2026-08-24T08:35:40.965Z" },
 ]
 
 [[package]]
@@ -2446,6 +2465,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl", hash = "sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523", size = 63772, upload-time = "2023-11-25T06:56:14.81Z" },
+]
+
+[[package]]
+name = "pgvector"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/ec/6eb80aebc728200f95229219882994c1b0585b956ca47da5edb9d062627a/pgvector-0.5.0.tar.gz", hash = "sha256:07a9dcf735696879406983afc6eba9a787cef7c0cf6c367ca1a5779f036dee74", size = 35170, upload-time = "2026-07-06T18:27:27.767Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/e4/a5573f2c579ca9ad133293bfb624148ba0893674ca4a6eeec85ced9a6a09/pgvector-0.5.0-py3-none-any.whl", hash = "sha256:fedc9800894e6da2be51358d7b7c574bf34f247ca741a5a09513622135f5964f", size = 30958, upload-time = "2026-07-06T18:27:26.797Z" },
 ]
 
 [[package]]

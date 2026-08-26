@@ -2,37 +2,28 @@
 
 from typing import Annotated, ClassVar
 
-from oa_configurator import (
-    CDMDatabaseConfig,
-    ModelConfig,
-    PackageConfigBase,
-    RefTo,
-    VectorStoreConfig,
-)
+from oa_configurator import GenericDatabaseConfig, ModelConfig, PackageConfigBase, RefTo
 from pydantic import Field
 
 
 class ComparatorRecommenderConfig(PackageConfigBase):
-    """References and defaults needed by a future recommender service."""
+    """References and defaults for the comparator recommendation service."""
 
     tool_name: ClassVar[str] = "comparator_recommender"
 
-    # CONFIGURATION EXTENSION POINT:
-    # do we assume that the comparator database is always separate from the CDM database? 
-    # probably yes and therefore there should be a distinct config for it. Probably need 
-    # to work through exactly what you expect as the first step in building this out...
-    # as defined below the comparator database is optional and defaults to the CDM database, 
-    # but that may not be the right approach.
-
-    comparator_db: Annotated[str, RefTo(CDMDatabaseConfig)] = Field(
-        default="cdm_db",
-        description="CDM database containing candidate comparator cohorts.",
+    comparator_db: Annotated[str, RefTo(GenericDatabaseConfig)] = Field(
+        default="comparator_db",
+        description="Database containing the cohort and pairwise similarity tables.",
     )
     embedding_model_name: Annotated[str | None, RefTo(ModelConfig)] = Field(
         default=None,
-        description="Optional embedding model for future semantic ranking.",
+        description=(
+            "Optional model used to find target cohorts by semantic similarity. "
+            "When unset, Groundworkers' shared embedding model is used."
+        ),
     )
-    vector_store_name: Annotated[str | None, RefTo(VectorStoreConfig)] = Field(
-        default=None,
-        description="Optional vector store for future semantic ranking.",
+    min_databases_default: int = Field(
+        default=1,
+        ge=1,
+        description="Default minimum number of databases supporting a recommendation.",
     )

@@ -1,68 +1,57 @@
-"""Connections to databases and other external systems.
+"""Connections to the comparator catalogue and its embedding model."""
 
-An adapter is the boundary between this plugin and something outside it. In this
-case that will be a database holding this plugin's own cs_cohorts/cs_similarity
-tables (see schema.py). Keeping database code here prevents SQL and connection
-details from spreading into the recommendation rules.
-"""
+from collections.abc import Callable
+from dataclasses import dataclass
 
-from __future__ import annotations
-
-from collections.abc import Sequence
-from dataclasses import dataclass, field
-
+from groundworkers.plugins import PluginReadinessResult
 from oa_configurator import ResolvedDatabase
-from sqlalchemy import select
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
+from omop_llm import ModelBackend
 
-from comparator_recommender.schema import CsCohort, CsSimilarity
+from comparator_recommender.backends import (
+    ComparatorSelectorBackend,
+    PostgresComparatorSelectorBackend,
+)
 
 
 @dataclass(frozen=True)
 class ComparatorDataAdapter:
-    """Comparator data access, always through schema.py's mapped classes.
-
-    ``select()``/``Session.get()`` against ``CsCohort``/``CsSimilarity``,
-    never ``text()`` or a raw connection.
-    """
+    """Own the database-backed comparator operations."""
 
     database: ResolvedDatabase
-    engine: Engine = field(init=False, repr=False, compare=False)
+    backend: ComparatorSelectorBackend
 
-    def __post_init__(self) -> None:
-        # schema_translate_map from ResolvedDatabase.create_engine keeps
-        # cs_cohorts/cs_similarity in whatever schema comparator_db names,
-        # not just the connection's default.
-        object.__setattr__(self, "engine", self.database.create_engine(future=True))
-
-    def _session(self) -> Session:
-        return Session(self.engine)
-
-    # ADAPTER EXTENSION POINT:
-    #
-    # Add further read methods here in the same shape as the two below:
-    # build a `select(...)`, run it inside `with self._session() as session:`,
-    # and return plain Python objects (or mapped instances). 
-    # 
-    # `find_target_cohort`'s embedding search still needs an
-    # embedding backend wired in separately; these two cover the
-    # deterministic half of `suggest_comparators`.
-
-    def get_cohort(self, cohort_id: int) -> CsCohort | None:
-        """Look up one candidate cohort by id."""
-
-        with self._session() as session:
-            return session.get(CsCohort, cohort_id)
-
-    def list_comparators(
-        self, target_cohort_id: int, *, min_databases: int
-    ) -> Sequence[CsSimilarity]:
-        """List comparator pairings meeting the minimum network overlap."""
-
-        statement = select(CsSimilarity).where(
-            CsSimilarity.target_cohort_id == target_cohort_id,
-            CsSimilarity.n_databases >= min_databases,
+    @classmethod
+    def build(
+        cls,
+        database: ResolvedDatabase,
+        model_backend_factory: Callable[[], ModelBackend] | None = None,
+        model_source: str | None = None,
+    ) -> "ComparatorDataAdapter":
+        return cls(
+            database=database,
+            backend=PostgresComparatorSelectorBackend(
+                engine=database.create_engine(),
+                schema=database.schema_name or "public",
+                model_backend_factory=model_backend_factory,
+                model_source=model_source,
+            ),
         )
-        with self._session() as session:
-            return session.scalars(statement).all()
+
+    def find_target(self, name: str, top_n: int) -> list[tuple[int, str]]:
+        return self.backend.find_target(name, top_n)
+
+    def recommend_comparators(
+        self, target_id: int, top_n: int, min_databases: int
+    ) -> list[tuple[float, str]]:
+        return self.backend.recommend_comparators(target_id, top_n, min_databases)
+
+    def insert_data(self, cohort_table_path: str, similarity_table_path: str) -> None:
+        self.backend.insert_data(cohort_table_path, similarity_table_path)
+
+    def create_embedding_vectors(self) -> None:
+        self.backend.create_embedding_vectors()
+
+    def verify_readiness(self) -> PluginReadinessResult:
+        """Return the backend's read-only readiness report."""
+
+        return self.backend.verify_readiness()
