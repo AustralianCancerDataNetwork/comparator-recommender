@@ -8,8 +8,8 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
-    create_mock_engine,
     create_engine,
+    create_mock_engine,
     inspect,
     select,
 )

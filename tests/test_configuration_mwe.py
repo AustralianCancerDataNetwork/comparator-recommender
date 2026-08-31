@@ -125,7 +125,7 @@ def test_installed_plugin_contributes_a_generic_setup_page(tmp_path: Path) -> No
 
     assert spec.validate().keys() == (
         "setup",
-        "plugin_comparator_recommender",
+        "gw_plugin-comparator_recommender",
         "comparator_recommender_load_source",
         "comparator_recommender_create_embeddings",
     )

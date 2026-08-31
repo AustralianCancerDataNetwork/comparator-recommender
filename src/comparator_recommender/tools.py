@@ -1,7 +1,8 @@
 """MCP tools exposed by the plugin."""
 
-from typing import Any
 import asyncio
+from typing import Any
+
 from comparator_recommender.services import ComparatorRecommenderService
 
 

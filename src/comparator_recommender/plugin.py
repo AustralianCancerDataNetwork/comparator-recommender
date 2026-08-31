@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from groundworkers.application.setup.maintenance_runs import (
-    MaintenancePlan,
-    MaintenanceStep,
+    Command,
+    CommandPlan,
+    CommandStep,
 )
-from groundworkers.application.setup.models import MaintenanceCommand
 from groundworkers.plugins import (
     PluginContext,
     PluginReadinessResult,
@@ -31,8 +31,8 @@ def _setup_command(
     command: str,
     arguments: tuple[str, ...],
     config_path: str,
-) -> MaintenanceCommand:
-    return MaintenanceCommand(
+) -> Command:
+    return Command(
         argv=(
             sys.executable,
             "-m",
@@ -46,13 +46,13 @@ def _setup_command(
 
 def _load_source_plan(
     values: Mapping[str, object], config_path: str
-) -> MaintenancePlan:
+) -> CommandPlan:
     cohort_path = str(values["cohort_table_path"])
     similarity_path = str(values["similarity_table_path"])
-    return MaintenancePlan(
+    return CommandPlan(
         kind="comparator-recommender-load-source",
         steps=(
-            MaintenanceStep(
+            CommandStep(
                 key="load-comparator-source",
                 command=_setup_command(
                     "load-source",
@@ -71,11 +71,11 @@ def _load_source_plan(
     )
 
 
-def _embedding_plan(_values: Mapping[str, object], config_path: str) -> MaintenancePlan:
-    return MaintenancePlan(
+def _embedding_plan(_values: Mapping[str, object], config_path: str) -> CommandPlan:
+    return CommandPlan(
         kind="comparator-recommender-create-embeddings",
         steps=(
-            MaintenanceStep(
+            CommandStep(
                 key="create-comparator-embeddings",
                 command=_setup_command("create-embeddings", (), config_path),
                 affected_resources=(f"comparator:{config_path}",),
