@@ -1,0 +1,64 @@
+name: Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/compatibility.yml
+      - pyproject.toml
+      - src/**
+      - tests/**
+  push:
+    tags: ['v*']
+  repository_dispatch:
+    types: [groundworkers-compatibility]
+  workflow_dispatch:
+    inputs:
+      groundworkers_version:
+        description: Released Groundworkers version to test
+        required: true
+        default: 0.5.0
+      python_versions:
+        description: Comma-separated Python versions to test
+        required: true
+        default: 3.12,3.13
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.matrix.outputs.include }}
+    steps:
+      - id: matrix
+        env:
+          REQUESTED_GROUNDWORKERS: ${{ github.event.client_payload.groundworkers_version || inputs.groundworkers_version || '0.5.0' }}
+          REQUESTED_PYTHON_JSON: ${{ toJSON(github.event.client_payload.python_versions) }}
+          INPUT_PYTHON_VERSIONS: ${{ inputs.python_versions || '3.12,3.13' }}
+        run: |
+          python -c 'import json, os; raw=os.environ["REQUESTED_PYTHON_JSON"]; versions=json.loads(raw) if raw not in ("", "null") else [v.strip() for v in os.environ["INPUT_PYTHON_VERSIONS"].split(",") if v.strip()]; gw=os.environ["REQUESTED_GROUNDWORKERS"]; print("include=" + json.dumps({"include": [{"python": version, "groundworkers": gw} for version in versions]}, separators=(",", ":")))' >> "$GITHUB_OUTPUT"
+
+  compatibility:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.include) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv build --wheel --out-dir compatibility-dist
+      - run: uv venv --python "${{ matrix.python }}" .compatibility-venv
+      - run: uv pip install --python .compatibility-venv/bin/python "groundworkers==${{ matrix.groundworkers }}"
+      - run: uv pip install --python .compatibility-venv/bin/python compatibility-dist/*.whl "pytest>=9,<10"
+      - run: .compatibility-venv/bin/python -m pytest -q
+
