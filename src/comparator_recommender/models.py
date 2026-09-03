@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pgvector.sqlalchemy import HALFVEC  # noqa: F401  (registers 'halfvec' for SQLAlchemy PG reflection)
 from sqlalchemy import BigInteger, MetaData, PrimaryKeyConstraint, Table, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import registry
@@ -60,7 +61,6 @@ class ComparatorModels:
         old table that lacks ``embedding_vector``; that is an explicit schema
         migration decision.
         """
-        from pgvector.sqlalchemy import HALFVEC
         from sqlalchemy import Column, Float, Integer, String
 
         metadata = MetaData()
