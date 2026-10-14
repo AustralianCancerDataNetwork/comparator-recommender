@@ -18,7 +18,7 @@ from oa_configurator import (
     GenericDatabaseConfig,
     Resolver,
     StackConfig,
-    load_stack_config_from_path,
+    load_stack_config,
     save_stack_config,
 )
 
@@ -36,12 +36,9 @@ def _write_minimal_stack(path: Path) -> None:
         databases={
             "cdm_db": CDMDatabaseConfig(
                 connection="cdm_main",
-                schema_name="main",
-                vocab_schema="main",
             ),
             "comparator_db": GenericDatabaseConfig(
                 connection="cdm_main",
-                schema_name="main",
             ),
         },
     )
@@ -64,12 +61,9 @@ def test_plugin_composes_adapter_service_and_diagnostic_tool() -> None:
         databases={
             "cdm_db": CDMDatabaseConfig(
                 connection="cdm_main",
-                schema_name="main",
-                vocab_schema="main",
             ),
             "comparator_db": GenericDatabaseConfig(
                 connection="cdm_main",
-                schema_name="main",
             ),
         },
     )
@@ -187,7 +181,7 @@ def test_generic_provider_writes_comparator_recommender_configuration(
     assert snapshot.can_apply
     assert controller.apply().applied
 
-    saved = load_stack_config_from_path(path)
+    saved = load_stack_config(path)
     configured = ComparatorRecommenderConfig.validate_candidate(saved)
     assert saved.tools["comparator_recommender"] == {
         "comparator_db": "comparator_db",

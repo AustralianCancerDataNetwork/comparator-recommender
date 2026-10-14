@@ -1,4 +1,7 @@
+from unittest.mock import Mock
+
 import pytest
+from omop_llm import EmbeddingRole
 from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import (
     BigInteger,
@@ -253,3 +256,55 @@ def test_embedding_creation_rejects_empty_source_before_model_use() -> None:
     with pytest.raises(RuntimeError, match="Load non-empty comparator"):
         backend.create_embedding_vectors()
     assert model_used is False
+
+
+@pytest.mark.parametrize(
+    ("vectors", "error"),
+    [
+        ([[0.5, 1.0], [1.0, 0.5]], None),
+        ([[0.5, 1.0]], "Expected 2 embeddings, got 1"),
+    ],
+)
+def test_embedding_creation_uses_omop_emb_without_a_shared_registry(
+    monkeypatch, vectors, error
+) -> None:
+    engine = create_engine("sqlite://")
+    # SQLite needs the pgvector reflection type to round-trip vector values.
+    monkeypatch.setitem(engine.dialect.ischema_names, "HALFVEC", HALFVEC)
+    ComparatorModels.create_catalogue_tables(engine, "main")
+    models = ComparatorModels.reflect(engine, "main")
+    with engine.begin() as connection:
+        connection.execute(
+            models.cohort_table.insert(),
+            [
+                {"cohort_definition_id": 2, "cohort_name": "Beta"},
+                {"cohort_definition_id": 1, "cohort_name": "Alpha"},
+            ],
+        )
+        connection.execute(
+            models.similarity_table.insert(),
+            {"cohort_definition_id_1": 1, "cohort_definition_id_2": 2},
+        )
+    model = Mock()
+    model.embed_texts.return_value = vectors
+    backend = PostgresComparatorSelectorBackend(
+        engine, "main", model_backend_factory=lambda: model
+    )
+
+    if error is None:
+        backend.create_embedding_vectors()
+    else:
+        with pytest.raises(RuntimeError, match=error):
+            backend.create_embedding_vectors()
+
+    model.embed_texts.assert_called_once_with(
+        ["Alpha", "Beta"], role=EmbeddingRole.DOCUMENT, batch_size=None
+    )
+    with engine.connect() as connection:
+        stored = connection.scalars(
+            select(models.cohort_table.c.embedding_vector).order_by(
+                models.cohort_table.c.cohort_definition_id
+            )
+        ).all()
+    assert stored == (vectors if error is None else [None, None])
+    assert inspect(engine).get_table_names() == ["cs_cohort", "cs_similarity"]

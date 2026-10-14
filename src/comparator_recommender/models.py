@@ -9,8 +9,9 @@ SQLAlchemy expressions for reads and updates.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from pgvector.sqlalchemy import HALFVEC  # noqa: F401  (registers 'halfvec' for SQLAlchemy PG reflection)
+from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import BigInteger, MetaData, PrimaryKeyConstraint, Table, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import registry
@@ -20,8 +21,8 @@ from sqlalchemy.orm import registry
 class ComparatorModels:
     """Reflected ORM classes for one configured comparator schema."""
 
-    cohort: type
-    similarity: type
+    cohort: type[Any]
+    similarity: type[Any]
     cohort_table: Table
     similarity_table: Table
 
@@ -90,7 +91,7 @@ def _ensure_primary_key(table: Table, *column_names: str) -> None:
     if any(column is None for column in columns):
         missing = [name for name, column in zip(column_names, columns, strict=True) if column is None]
         raise RuntimeError(f"{table.fullname} is missing required columns: {', '.join(missing)}")
-    table.append_constraint(PrimaryKeyConstraint(*columns))
+    table.append_constraint(PrimaryKeyConstraint(*column_names))
 
 
 def has_column(engine: Engine, schema: str, table: str, column: str) -> bool:
