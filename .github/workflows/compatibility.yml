@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/compatibility.yml
       - pyproject.toml
+      - uv.lock
       - src/**
       - tests/**
   push:
@@ -17,7 +18,7 @@ on:
       groundworkers_version:
         description: Released Groundworkers version to test
         required: true
-        default: 0.5.0
+        default: 0.7.0
       python_versions:
         description: Comma-separated Python versions to test
         required: true
@@ -36,7 +37,7 @@ jobs:
     steps:
       - id: matrix
         env:
-          REQUESTED_GROUNDWORKERS: ${{ github.event.client_payload.groundworkers_version || inputs.groundworkers_version || '0.5.0' }}
+          REQUESTED_GROUNDWORKERS: ${{ github.event.client_payload.groundworkers_version || inputs.groundworkers_version || '0.7.0' }}
           REQUESTED_PYTHON_JSON: ${{ toJSON(github.event.client_payload.python_versions) }}
           INPUT_PYTHON_VERSIONS: ${{ inputs.python_versions || '3.12,3.13' }}
         run: |
