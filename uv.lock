@@ -524,7 +524,7 @@ wheels = [
 
 [[package]]
 name = "comparator-recommender"
-version = "0.0.1"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "groundworkers", extra = ["tui"] },
