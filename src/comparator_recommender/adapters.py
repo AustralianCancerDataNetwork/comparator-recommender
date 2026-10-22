@@ -30,7 +30,7 @@ class ComparatorDataAdapter:
         return cls(
             database=database,
             backend=PostgresComparatorSelectorBackend(
-                engine=database.create_engine(),
+                engine=database.create_engine(register_claims=False),
                 schema=database.schema_name or "public",
                 model_backend_factory=model_backend_factory,
                 model_source=model_source,
