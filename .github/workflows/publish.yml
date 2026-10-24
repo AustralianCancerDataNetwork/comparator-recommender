@@ -1,0 +1,12 @@
+name: Publish
+# Private release: attach the built wheel and sdist to a GitHub Release.
+# Nothing is uploaded to PyPI. Install from the tag, e.g.
+#   uv add "<name> @ git+ssh://git@github.com/<org>/<repo>.git@<tag>"
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: AustralianCancerDataNetwork/groundworkers-plugin-catalogue/.github/workflows/private-release.yml@main
