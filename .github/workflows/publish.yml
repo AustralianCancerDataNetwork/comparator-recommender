@@ -1,12 +1,21 @@
 name: Publish
-# Private release: attach the built wheel and sdist to a GitHub Release.
-# Nothing is uploaded to PyPI. Install from the tag, e.g.
-#   uv add "<name> @ git+ssh://git@github.com/<org>/<repo>.git@<tag>"
 on:
   push:
     tags: ['v*']
 jobs:
-  release:
+  build:
+    uses: AustralianCancerDataNetwork/cava-devops/.github/workflows/publish.yml@main
+  publish:
+    # Inline: PyPI OIDC checks job_workflow_ref, which must point to this file.
+    # Moving pypa/gh-action-pypi-publish into cava-devops would break the trusted publisher.
+    needs: build
+    runs-on: ubuntu-latest
     permissions:
-      contents: write
-    uses: AustralianCancerDataNetwork/groundworkers-plugin-catalogue/.github/workflows/private-release.yml@main
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/comparator-recommender
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist/ }
+      - uses: pypa/gh-action-pypi-publish@release/v1
