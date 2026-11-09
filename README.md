@@ -1,79 +1,106 @@
 # Comparator Recommender
 
-This package is an installable Groundworkers plugin for finding target cohorts
-and recommending pairwise comparators from a precomputed comparator catalogue.
+A [Groundworkers](https://github.com/AustralianCancerDataNetwork/groundworkers) plugin that suggests comparator cohorts for a study. Give it a target cohort and it returns the cohorts most similar to it, ranked by similarity and filtered by how many databases support each pairing.
 
-It contributes two entry points:
+The plugin does not compute cohort similarity itself. It serves a catalogue that you load from two CSV files: one listing cohorts, one listing pairwise similarity scores between them.
 
-- `omop.config` exposes `ComparatorRecommenderConfig` to oa-configurator.
-- `groundworkers.plugins` exposes the plugin singleton to Groundworkers.
-
-The configuration schema selects a generic comparator database, optionally selects an embedding model for target lookup, and sets the default minimum database support threshold. Groundworkers builds the setup-console workflow directly from this schema without plugin-specific TUI code.
-
-The setup console also exposes the plugin's registered preparation steps:
-
-- `Load comparator source` asks for the cohort and pairwise-similarity CSVs and loads them into the catalogue.
-- `Create comparator embeddings` generates the stored vectors after the source is loaded.
-
-The CSV paths are run arguments, not persistent plugin configuration. Both steps use Groundworkers' durable maintenance-run surface, so progress and logs appear with the core graph and embedding preparation runs.
-
-Run the MWE against the published Groundworkers 0.7 stack:
+## Install
 
 ```console
-uv sync --group dev
-uv run pytest
+uv add comparator-recommender
 ```
 
-The acceptance test selects an existing CDM database, leaves the optional
-embedding resources unconfigured, reviews the generated change, applies it, and
-verifies the resulting `[tools.comparator_recommender]` section.
+or `pip install comparator-recommender`. Groundworkers discovers the plugin automatically once it is installed in the same environment.
 
-## Upgrading to the Groundworkers 0.7 stack
+## Requirements
 
-This plugin requires `groundworkers[tui]>=0.7,<1`, `oa-configurator>=2,<3`
-and `omop-emb>=3,<4`. For CDM database entries, replace the former
-`schema_name` setting with `cdm_schema`; generic databases such as
-`comparator_db` still use `schema_name`. Remove schema settings from SQLite
-database entries. See the [Groundworkers upgrade guide](https://github.com/AustralianCancerDataNetwork/groundworkers/blob/main/docs/usage/upgrading-from-0.6.md)
-for the shared configuration changes.
+- Python 3.12 or later
+- Groundworkers 0.7 or later
+- PostgreSQL with the [pgvector](https://github.com/pgvector/pgvector) extension available. The plugin runs `CREATE EXTENSION IF NOT EXISTS vector`on first load, so the database user needs permission to do that, or an administrator must enable the extension beforehand.
+- An embedding model, if you want to look up target cohorts by name. Either the model Groundworkers already uses or one you configure for this plugin.
 
-**The embedding-store migration script is not available yet.** It is tracked
-in [oa-configurator issue #40](https://github.com/AustralianCancerDataNetwork/oa-configurator/issues/40).
-Existing shared stores created before omop-emb 3.0 report `LEGACY_REGISTRY`.
-The [omop-emb legacy-registry guard and migration-command placeholder](https://github.com/AustralianCancerDataNetwork/omop-emb/blob/main/src/omop_emb/model_registry/model_registry_orm.py)
-remain the source of the planned migration command; follow the issue for its
-availability before attempting migration. This plugin does not migrate shared
-embedding stores.
+## Configure
 
-Comparator vectors live in `cs_cohort.embedding_vector` in the comparator
-database. The plugin uses omop-emb to generate vectors directly from the selected
-model, without opening the shared embedding-store registry. Upgrading the Python
-packages does not migrate or regenerate existing comparator vectors. Keep the
-same embedding model for creation and lookup; if changing models, explicitly
-rerun `Create comparator embeddings` after loading the source catalogue.
+Run the Groundworkers setup console and open **Comparator Recommender**:
 
-## Architecture
+```console
+groundworkers tui
+```
 
-The package separates four responsibilities:
+It writes a section like this to your Groundworkers configuration file:
 
-- `config.py` declares operator-controlled settings and references to shared OA
-  resources.
-- `adapters.py` owns the resolved database connection and backend.
-- `models.py` reflects the two non-OMOP catalogue tables into SQLAlchemy mappings.
-- `backends/postgresql.py` uses SQLAlchemy `select`, pgvector expressions,
-  mapped row updates, and `Index` objects, with one isolated column migration
-  for older catalogue tables. Its backend initialization follows the
-  `omop-emb` lifecycle and ensures the pgvector extension before setup runs.
-- `services.py` owns input policy and recommendation defaults. It receives
-  ordinary Python values from adapters and contains no MCP code.
-- `tools.py` exposes service operations to agents. Tools should be thin wrappers,
-  not a second implementation of the analysis.
+```toml
+[databases.comparator_db]
+kind = "generic"
+connection = "cdm_main"        # any [connections.*] entry pointing at PostgreSQL
+schema_name = "comparator"     # the schema must already exist
 
-`plugin.py` is the composition root: Groundworkers calls it once during startup
-to connect configuration to adapters and services, then asks it to register the
-tools. Business logic should not be implemented inside `build()`.
+[tools.comparator_recommender]
+comparator_db = "comparator_db"
+# embedding_model_name = "embedding_model"   # optional; defaults to the Groundworkers model
+# min_databases_default = 1                  # optional
+```
 
-The comparator catalogue is not an OMOP CDM table, so it should not be added to
-`omop-alchemy`'s model registry. The local reflected mapping follows the same
-SQLAlchemy model/query conventions while leaving the shared OMOP package focused
-on CDM semantics.
+| Setting | Default | Meaning |
+|---|---|---|
+| `comparator_db` | `comparator_db` | The `[databases.*]` entry that holds the catalogue. |
+| `embedding_model_name` | unset | A `[models.*]` entry for target lookup. When unset, the Groundworkers embedding model is used. |
+| `min_databases_default` | `1` | Ignore comparator pairs seen in fewer databases than this, unless a request overrides it. |
+
+See the Groundworkers
+[configuration guide](https://github.com/AustralianCancerDataNetwork/groundworkers/blob/main/docs/usage/configuration.md) for `[connections.*]`, `[databases.*]` and `[models.*]` entries.
+
+## Load your data
+
+The setup console has two steps under **Comparator Recommender**. Run them in order:
+
+1. **Load comparator source.** Choose the cohort CSV and the similarity CSV. Each load replaces the whole catalogue.
+2. **Create comparator embeddings.** Generates a vector for every cohort name so cohorts can be found by name. Re-run this after every load.
+
+Then select **Verify**. It reports whether the database, tables, embeddings, vector index and model are ready.
+
+### CSV format
+
+Both files may be plain `.csv` or gzipped `.csv.gz`, with a header row.
+
+**Cohort file**, one row per cohort:
+
+| Column | Type | Meaning |
+|---|---|---|
+| `cohort_definition_id` | integer | Unique cohort ID. |
+| `cohort_name` | text | Human-readable name. Required for every row: embedding fails if any name is empty. |
+| `database_count` | integer | Number of databases the cohort was observed in. |
+
+**Similarity file**, one row per cohort pair:
+
+| Column | Type | Meaning |
+|---|---|---|
+| `cohort_definition_id_1` | integer | One cohort in the pair. |
+| `cohort_definition_id_2` | integer | The other cohort. |
+| `mean_cosine_similarity` | number | Similarity score; higher means more alike. |
+| `database_count` | integer | Number of databases contributing to the score. |
+
+Pairs are undirected: list each pair once, in either order. A pair is found whichever of its cohorts is the target, so listing it in both orders returns the comparator twice.
+
+## Tools
+
+Once loaded, Groundworkers exposes three tools to agents and MCP clients:
+
+| Tool | Inputs | Returns |
+|---|---|---|
+| `comparator_recommender_find_target` | `name`, `top_n` (default 10) | Cohorts whose names are closest in meaning to `name`, with their IDs. |
+| `comparator_recommender_recommend` | `target_id`, `top_n` (default 10), `min_databases` (optional) | The most similar comparator cohorts for that target, with similarity scores. |
+| `comparator_recommender_status` | none | The same readiness report as **Verify**. |
+
+A typical session: find the target cohort by name, then pass its ID to `comparator_recommender_recommend`.
+
+## Troubleshooting
+
+- **"Target lookup requires an embedding model"**: neither the plugin nor Groundworkers has an embedding model configured. Set `embedding_model_name`, or configure a Groundworkers embedding model.
+- **"Every comparator cohort source row must have a cohort name"**: the cohort CSV has blank `cohort_name` values. Fix the file and load it again.
+- **Name lookup returns nothing after a reload**: loading replaces the catalogue, including its embeddings. Run **Create comparator embeddings** again.
+- **Results look wrong after changing models**: vectors made with one model can't be searched with another. Keep the same model for creating and looking up, or re-run **Create comparator embeddings** after switching.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
